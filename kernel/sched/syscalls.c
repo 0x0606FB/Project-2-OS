@@ -1491,6 +1491,9 @@ SYSCALL_DEFINE1(sched_get_priority_max, int, policy)
 	case SCHED_RR:
 		ret = MAX_RT_PRIO-1;
 		break;
+	case SCHED_GRR:
+		ret = 0;
+		break;
 	case SCHED_DEADLINE:
 	case SCHED_NORMAL:
 	case SCHED_BATCH:
@@ -1518,6 +1521,9 @@ SYSCALL_DEFINE1(sched_get_priority_min, int, policy)
 	case SCHED_FIFO:
 	case SCHED_RR:
 		ret = 1;
+		break;
+	case SCHED_GRR:
+		ret = 0;
 		break;
 	case SCHED_DEADLINE:
 	case SCHED_NORMAL:
