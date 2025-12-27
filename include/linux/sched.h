@@ -849,7 +849,9 @@ struct task_struct {
 	struct sched_ext_entity		scx;
 #endif
 	const struct sched_class	*sched_class;
-
+	struct list_head		grr_list;	/* GRR run queue list entry */
+	unsigned int			grr_time_slice;	/* Remaining time slice in jiffies */
+	int				grr_group;	/* GRR_DEFAULT or GRR_PERFORMANCE */
 #ifdef CONFIG_SCHED_CORE
 	struct rb_node			core_node;
 	unsigned long			core_cookie;
