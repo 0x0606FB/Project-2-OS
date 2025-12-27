@@ -8553,6 +8553,7 @@ void __init sched_init(void)
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt);
 		init_dl_rq(&rq->dl);
+		init_grr_rq(&rq->grr, i);
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
 		rq->tmp_alone_branch = &rq->leaf_cfs_rq_list;
@@ -8667,7 +8668,7 @@ void __init sched_init(void)
 #endif
 	init_sched_fair_class();
 	init_sched_ext_class();
-
+	init_grr_scheduler();
 	psi_init();
 
 	init_uclamp();

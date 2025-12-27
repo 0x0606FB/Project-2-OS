@@ -903,6 +903,36 @@ struct dl_rq {
 	u64			bw_ratio;
 };
 
+/*
+ * GRR (Group Round-Robin) Scheduler Structures
+ */
+
+#define GRR_DEFAULT       1
+#define GRR_PERFORMANCE   2
+#define GRR_NGROUPS       2
+
+/* Per-CPU runqueue for GRR tasks */
+struct grr_rq {
+	struct list_head task_list;      /* list of runnable tasks in this group */
+	unsigned int nr_running;          /* count of runnable GRR tasks on this CPU */
+	unsigned int nr_tasks;            /* total GRR tasks (running + waiting) */
+	int curr_group;                   /* which group this CPU belongs to (1 or 2) */
+	/* Future:  load balancing info */
+};
+
+/* Global GRR group management */
+struct grr_group {
+	int group_id;                     /* GRR_DEFAULT or GRR_PERFORMANCE */
+	cpumask_var_t cpus;               /* which CPUs belong to this group */
+	int ncores;                       /* count of CPUs in this group */
+	raw_spinlock_t lock;              /* protects this structure during updates */
+	/* Future: per-group load balancing, migration stats */
+};
+
+/* Global GRR state */
+extern struct grr_group grr_groups[GRR_NGROUPS];
+extern raw_spinlock_t grr_global_lock;
+
 #ifdef CONFIG_FAIR_GROUP_SCHED
 
 /* An entity is a task if it doesn't "own" a runqueue */
@@ -1140,6 +1170,7 @@ struct rq {
 	struct cfs_rq		cfs;
 	struct rt_rq		rt;
 	struct dl_rq		dl;
+	struct grr_rq		grr;
 #ifdef CONFIG_SCHED_CLASS_EXT
 	struct scx_rq		scx;
 #endif
@@ -2719,6 +2750,8 @@ extern void update_max_interval(void);
 extern void init_sched_dl_class(void);
 extern void init_sched_rt_class(void);
 extern void init_sched_fair_class(void);
+extern void init_grr_scheduler(void); //declaration
+
 
 extern void resched_curr(struct rq *rq);
 extern void resched_curr_lazy(struct rq *rq);
