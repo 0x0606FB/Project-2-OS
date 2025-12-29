@@ -542,7 +542,7 @@ static void update_curr_grr(struct rq *rq)
  */
 void __init init_grr_scheduler(void)
 {
-	int ncpus = num_possible_cpus();
+	int ncpus = num_online_cpus();
 	int half;
 	int cpu;
 
