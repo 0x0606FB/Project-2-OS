@@ -542,7 +542,7 @@ static void update_curr_grr(struct rq *rq)
  */
 void __init init_grr_scheduler(void)
 {
-	int ncpus = num_online_cpus();
+	int ncpus = num_present_cpus();
 	int half;
 	int cpu;
 
@@ -557,7 +557,7 @@ void __init init_grr_scheduler(void)
 	pr_info("GRR:  Initializing with %d CPUs\n", ncpus);
 
 	/* Initialize cpumask storage */
-	if (! alloc_cpumask_var(&grr_groups[0]. cpus, GFP_KERNEL))
+	if (!alloc_cpumask_var(&grr_groups[0]. cpus, GFP_KERNEL))
 		panic("GRR: Failed to allocate cpumask for DEFAULT group");
 	if (!alloc_cpumask_var(&grr_groups[1].cpus, GFP_KERNEL))
 		panic("GRR: Failed to allocate cpumask for PERFORMANCE group");
