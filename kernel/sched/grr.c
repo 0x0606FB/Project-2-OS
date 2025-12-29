@@ -3,6 +3,13 @@
 /* Time slice:  100ms converted to jiffies */
 #define GRR_TIMESLICE		(HZ / 10)  /* 100ms */
 
+/* Forward declarations */
+static void update_curr_grr(struct rq *rq);
+static void put_prev_task_grr(struct rq *rq, struct task_struct *p, struct task_struct *next);
+
+/* Declare grr_sched_class as extern since it's defined at the bottom */
+extern const struct sched_class grr_sched_class;
+
 /* Global GRR group structures */
 struct grr_group grr_groups[GRR_NGROUPS] = {
 	[0] = {
@@ -69,9 +76,10 @@ static int find_idlest_cpu_in_group(int group_id)
 	return best_cpu;
 }
 
+#ifdef CONFIG_SMP
 /**
  * find_busiest_cpu_in_group - find the most loaded CPU in a GRR group
- * @group_id:  The group to search
+ * @group_id: The group to search
  *
  * Returns: CPU number with longest runqueue, or -1 if group is empty
  */
@@ -103,7 +111,7 @@ static int find_busiest_cpu_in_group(int group_id)
 
 /**
  * can_migrate_task_grr - Check if a task can be migrated
- * @p: task to check
+ * @p:  task to check
  * @dst_cpu: destination CPU
  *
  * Returns: true if task can be migrated to dst_cpu
@@ -124,6 +132,7 @@ static bool can_migrate_task_grr(struct task_struct *p, int dst_cpu)
 
 	return true;
 }
+#endif /* CONFIG_SMP */
 
 /*
  * Enqueue a task into the GRR runqueue
@@ -206,8 +215,8 @@ static bool yield_to_task_grr(struct rq *rq, struct task_struct *p)
 static void wakeup_preempt_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	/* 
-	 * GRR is non-preemptive within the class. 
-	 * A newly woken task just gets added to the queue.
+	 * GRR is non-preemptive within the class.  
+	 * A newly woken task just gets added to the queue. 
 	 * We only preempt if there's no current GRR task running.
 	 */
 	if (rq->curr->sched_class != &grr_sched_class)
@@ -235,7 +244,7 @@ static struct task_struct *pick_task_grr(struct rq *rq)
 		return NULL;
 
 	/* Get first task from the list */
-	p = grr_task_of(grr_rq->task_list.next);
+	p = grr_task_of(grr_rq->task_list. next);
 
 	return p;
 }
@@ -275,7 +284,7 @@ static void put_prev_task_grr(struct rq *rq, struct task_struct *p, struct task_
 static void set_next_task_grr(struct rq *rq, struct task_struct *p, bool first)
 {
 	/* Nothing special needed for GRR */
-	p->se.exec_start = rq_clock_task(rq);
+	p->se. exec_start = rq_clock_task(rq);
 }
 
 #ifdef CONFIG_SMP
@@ -286,6 +295,7 @@ static int select_task_rq_grr(struct task_struct *p, int task_cpu, int flags)
 {
 	int group_id = p->grr_group;
 	int new_cpu;
+	struct grr_group *group;
 
 	/* Find the idlest CPU in the task's group */
 	new_cpu = find_idlest_cpu_in_group(group_id);
@@ -296,7 +306,7 @@ static int select_task_rq_grr(struct task_struct *p, int task_cpu, int flags)
 
 	/* Fall back to current CPU if it's allowed and in the group */
 	if (cpumask_test_cpu(task_cpu, &p->cpus_mask)) {
-		struct grr_group *group = grr_get_group(group_id);
+		group = grr_get_group(group_id);
 		if (group && cpumask_test_cpu(task_cpu, group->cpus))
 			return task_cpu;
 	}
@@ -362,7 +372,7 @@ static struct rq *find_lock_rq_grr(struct task_struct *p, struct rq *rq)
 	later_rq = cpu_rq(cpu);
 
 	/* Double-lock the runqueues */
-	if (later_rq->grr. nr_running < rq->grr.nr_running) {
+	if (later_rq->grr.nr_running < rq->grr. nr_running) {
 		double_lock_balance(rq, later_rq);
 		
 		if (can_migrate_task_grr(p, cpu))
@@ -457,8 +467,8 @@ static void switched_to_grr(struct rq *rq, struct task_struct *p)
 	/* Check if we should preempt current task */
 	if (task_on_rq_queued(p)) {
 		if (rq->curr != p) {
-			if (rq->curr->sched_class != &grr_sched_class ||
-			    p->prio < rq->curr->prio)
+			/* GRR doesn't use priorities for preemption within the class */
+			if (rq->curr->sched_class != &grr_sched_class)
 				resched_curr(rq);
 		}
 	}
@@ -469,10 +479,7 @@ static void switched_to_grr(struct rq *rq, struct task_struct *p)
  */
 static void prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
 {
-	/* GRR doesn't really use priorities, but handle it anyway */
-	if (task_on_rq_queued(p) && rq->curr == p) {
-		/* Nothing to do - we're round-robin */
-	}
+	/* GRR doesn't really use priorities, nothing to do */
 }
 
 /*
@@ -499,7 +506,7 @@ static void update_curr_grr(struct rq *rq)
 	if (unlikely((s64)delta_exec <= 0))
 		return;
 
-	curr->se.sum_exec_runtime += delta_exec;
+	curr->se. sum_exec_runtime += delta_exec;
 	curr->se.exec_start = now;
 }
 
@@ -523,7 +530,7 @@ void __init init_grr_scheduler(void)
 	pr_info("GRR:  Initializing with %d CPUs\n", ncpus);
 
 	/* Initialize cpumask storage */
-	if (! alloc_cpumask_var(&grr_groups[0].cpus, GFP_KERNEL))
+	if (! alloc_cpumask_var(&grr_groups[0]. cpus, GFP_KERNEL))
 		panic("GRR: Failed to allocate cpumask for DEFAULT group");
 	if (!alloc_cpumask_var(&grr_groups[1].cpus, GFP_KERNEL))
 		panic("GRR: Failed to allocate cpumask for PERFORMANCE group");
@@ -534,7 +541,7 @@ void __init init_grr_scheduler(void)
 	/* Split CPUs 50/50 */
 	for_each_possible_cpu(cpu) {
 		if (cpu < half) {
-			cpumask_set_cpu(cpu, grr_groups[0].cpus);
+			cpumask_set_cpu(cpu, grr_groups[0]. cpus);
 		} else {
 			cpumask_set_cpu(cpu, grr_groups[1].cpus);
 		}
@@ -548,11 +555,11 @@ void __init init_grr_scheduler(void)
 		grr_groups[1].ncores = 1;
 	} else {
 		grr_groups[0].ncores = half;
-		grr_groups[1].ncores = ncpus - half;
+		grr_groups[1]. ncores = ncpus - half;
 	}
 
 	pr_info("GRR: DEFAULT group:  %d CPUs, PERFORMANCE group: %d CPUs\n",
-	        grr_groups[0]. ncores, grr_groups[1].ncores);
+	        grr_groups[0].ncores, grr_groups[1].ncores);
 }
 
 /**
@@ -569,9 +576,13 @@ void init_grr_rq(struct grr_rq *grr_rq, int cpu)
 	grr_rq->nr_tasks = 0;
 	grr_rq->curr_group = GRR_DEFAULT;
 
-	/* Determine which group this CPU belongs to */
+	/* 
+	 * Note: At early boot, grr_groups[i].cpus might not be allocated yet. 
+	 * The curr_group will be properly set when init_grr_scheduler() runs.
+	 */
 	for (i = 0; i < GRR_NGROUPS; i++) {
-		if (grr_groups[i].cpus && cpumask_test_cpu(cpu, grr_groups[i].cpus)) {
+		if (cpumask_available(grr_groups[i].cpus) && 
+		    cpumask_test_cpu(cpu, grr_groups[i]. cpus)) {
 			grr_rq->curr_group = grr_groups[i].group_id;
 			break;
 		}
@@ -583,7 +594,7 @@ void init_grr_rq(struct grr_rq *grr_rq, int cpu)
  * Note: Use DEFINE_SCHED_CLASS macro for proper linker section placement
  */
 DEFINE_SCHED_CLASS(grr) = {
-	.enqueue_task		= enqueue_task_grr,
+	. enqueue_task		= enqueue_task_grr,
 	.dequeue_task		= dequeue_task_grr,
 	.yield_task		= yield_task_grr,
 	.yield_to_task		= yield_to_task_grr,
@@ -598,12 +609,12 @@ DEFINE_SCHED_CLASS(grr) = {
 	.set_next_task		= set_next_task_grr,
 
 #ifdef CONFIG_SMP
-	. select_task_rq		= select_task_rq_grr,
-	.migrate_task_rq	= migrate_task_rq_grr,
+	.select_task_rq		= select_task_rq_grr,
+	. migrate_task_rq	= migrate_task_rq_grr,
 	.task_woken		= task_woken_grr,
 	.set_cpus_allowed	= set_cpus_allowed_grr,
 	.rq_online		= rq_online_grr,
-	. rq_offline		= rq_offline_grr,
+	.rq_offline		= rq_offline_grr,
 	.find_lock_rq		= find_lock_rq_grr,
 #endif
 

@@ -2654,7 +2654,7 @@ static inline bool task_allowed_on_cpu(struct task_struct *p, int cpu)
 		return false;
 
 	/* Can @cpu run a user thread? */
-	if (!(p->flags & PF_KTHREAD) && !task_cpu_possible(cpu, p))
+	if (!(p->flags & PF_KTHREAD) && !cpumask_test_cpu(cpu, p->cpus_ptr)) //threw an error, deprecated
 		return false;
 
 	return true;
