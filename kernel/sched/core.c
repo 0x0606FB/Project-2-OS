@@ -10745,36 +10745,34 @@ SYSCALL_DEFINE2(sched_assign_ncores_to_group, int, ncores, int, group) {
 SYSCALL_DEFINE2(sched_assign_process_to_group, pid_t, pid, int, group) {
     struct task_struct *task;
     struct rq *rq;
-    struct rq_flags rf;	
+    struct rq_flags rf;
 
-    /* Ensure only root can invoke this syscall */
-    if (!capable(CAP_SYS_ADMIN))
-        return -EPERM;
+    printk(KERN_INFO "GRR: Assigning PID %d to group %d\n", pid, group);
 
-    /* Validate group ID */
-    if (group != GRR_DEFAULT && group != GRR_PERFORMANCE)
+    /* Validate the group ID */
+    if (group != GRR_DEFAULT && group != GRR_PERFORMANCE) {
+        printk(KERN_ERR "GRR: Invalid group ID: %d\n", group);
         return -EINVAL;
+    }
 
     /* Find the task by PID */
     task = find_task_by_vpid(pid);
-    if (!task)
+    if (!task) {
+        printk(KERN_ERR "GRR: Invalid PID: %d (No such process)\n", pid);
         return -ESRCH;
+    }
 
-    /* Ensure the task uses the GRR scheduler */
-    if (task->policy != SCHED_GRR)
+    /* Ensure the target task is using the GRR scheduler policy */
+    if (task->policy != SCHED_GRR) {
+        printk(KERN_ERR "GRR: Task %d is not using the GRR scheduler policy\n", pid);
         return -EINVAL;
+    }
 
-    /* Lock the task and its runqueue */
+    /* Proceed with group assignment */
     rq = task_rq_lock(task, &rf);
-
-    /* Switch the task's group ID */
     switch_grr_task_group(rq, task, group);
-
-    /* Unlock the runqueue */
     task_rq_unlock(rq, task, &rf);
 
-    printk(KERN_INFO "GRR: Process %d assigned to group %s\n", pid,
-           group == GRR_DEFAULT ? "DEFAULT" : "PERFORMANCE");
-
+    printk(KERN_INFO "GRR: Successfully assigned PID %d to group %d\n", pid, group);
     return 0;
 }
