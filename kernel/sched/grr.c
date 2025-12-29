@@ -83,7 +83,7 @@ static int find_idlest_cpu_in_group(int group_id)
  *
  * Returns: CPU number with longest runqueue, or -1 if group is empty
  */
-static int find_busiest_cpu_in_group(int group_id)
+static __maybe_unused int find_busiest_cpu_in_group(int group_id)
 {
 	struct grr_group *group;
 	int cpu, best_cpu = -1;
@@ -133,6 +133,7 @@ static bool can_migrate_task_grr(struct task_struct *p, int dst_cpu)
 	return true;
 }
 #endif /* CONFIG_SMP */
+
 
 /*
  * Enqueue a task into the GRR runqueue
@@ -383,6 +384,32 @@ static struct rq *find_lock_rq_grr(struct task_struct *p, struct rq *rq)
 
 	return NULL;
 }
+
+
+void switch_grr_task_group(struct rq *rq, struct task_struct *task, int new_group_id) {
+    struct grr_rq *old_grr_rq, *new_grr_rq;
+
+    /* Get the runqueues for the old and new groups */
+    old_grr_rq = &rq->grr; // Current group's runqueue
+    new_grr_rq = &rq->grr; // Simulate fetching the new runqueue
+
+    /* Remove task from old group */
+    dequeue_task_grr(rq, task, 0);
+
+    /* Assign the task to the new group */
+    task->grr_group = new_group_id;
+
+    /* Add task to the new group */
+    enqueue_task_grr(rq, task, 0);
+
+    /* Update runqueue counters */
+    old_grr_rq->nr_tasks--;
+    new_grr_rq->nr_tasks++;
+
+    printk(KERN_INFO "GRR: Task %d switched from group %d to group %d\n",
+           task->pid, old_grr_rq->curr_group, new_grr_rq->curr_group);
+}
+
 #endif /* CONFIG_SMP */
 
 /*

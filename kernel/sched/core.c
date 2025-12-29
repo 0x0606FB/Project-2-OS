@@ -10697,3 +10697,84 @@ void sched_enq_and_set_task(struct sched_enq_and_set_ctx *ctx)
 		set_next_task(rq, ctx->p);
 }
 #endif	/* CONFIG_SCHED_CLASS_EXT */
+
+#define MIN_CORES_PER_GROUP 1
+
+SYSCALL_DEFINE2(sched_assign_ncores_to_group, int, ncores, int, group) {
+    int total_cores = num_online_cpus();
+    struct grr_group *default_group, *performance_group;
+
+    /* Ensure only root can invoke this syscall */
+    if (!capable(CAP_SYS_ADMIN))
+        return -EPERM;
+
+    /* Validate group ID */
+    if (group != GRR_DEFAULT && group != GRR_PERFORMANCE)
+        return -EINVAL;
+
+    /* Validate core assignment: both groups must have at least 1 core */
+    if (ncores < MIN_CORES_PER_GROUP || (total_cores - ncores) < MIN_CORES_PER_GROUP)
+        return -EINVAL;
+
+    /* Get the groups */
+    default_group = &grr_groups[GRR_DEFAULT - 1];
+    performance_group = &grr_groups[GRR_PERFORMANCE - 1];
+
+    /* Assign cores to groups */
+    cpumask_clear(default_group->cpus);
+    cpumask_clear(performance_group->cpus);
+
+    if (group == GRR_DEFAULT) {
+        for (int i = 0; i < ncores; i++)
+            cpumask_set_cpu(i, default_group->cpus);
+        for (int i = ncores; i < total_cores; i++)
+            cpumask_set_cpu(i, performance_group->cpus);
+    } else if (group == GRR_PERFORMANCE) {
+        for (int i = 0; i < total_cores - ncores; i++)
+            cpumask_set_cpu(i, default_group->cpus);
+        for (int i = total_cores - ncores; i < total_cores; i++)
+            cpumask_set_cpu(i, performance_group->cpus);
+    }
+
+    printk(KERN_INFO "GRR: %d cores assigned to %s group, %d cores to the other group\n",
+           ncores, group == GRR_DEFAULT ? "DEFAULT" : "PERFORMANCE", total_cores - ncores);
+
+    return 0;
+}
+
+SYSCALL_DEFINE2(sched_assign_process_to_group, pid_t, pid, int, group) {
+    struct task_struct *task;
+    struct rq *rq;
+    struct rq_flags rf;	
+
+    /* Ensure only root can invoke this syscall */
+    if (!capable(CAP_SYS_ADMIN))
+        return -EPERM;
+
+    /* Validate group ID */
+    if (group != GRR_DEFAULT && group != GRR_PERFORMANCE)
+        return -EINVAL;
+
+    /* Find the task by PID */
+    task = find_task_by_vpid(pid);
+    if (!task)
+        return -ESRCH;
+
+    /* Ensure the task uses the GRR scheduler */
+    if (task->policy != SCHED_GRR)
+        return -EINVAL;
+
+    /* Lock the task and its runqueue */
+    rq = task_rq_lock(task, &rf);
+
+    /* Switch the task's group ID */
+    switch_grr_task_group(rq, task, group);
+
+    /* Unlock the runqueue */
+    task_rq_unlock(rq, task, &rf);
+
+    printk(KERN_INFO "GRR: Process %d assigned to group %s\n", pid,
+           group == GRR_DEFAULT ? "DEFAULT" : "PERFORMANCE");
+
+    return 0;
+}

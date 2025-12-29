@@ -911,8 +911,15 @@ struct dl_rq {
 #define GRR_PERFORMANCE   2
 #define GRR_NGROUPS       2
 
+extern void switch_grr_task_group(struct rq *rq, struct task_struct *task, int new_group_id);
+
 /* Per-CPU runqueue for GRR tasks */
 struct grr_rq {
+
+
+
+
+
 	struct list_head task_list;      /* list of runnable tasks in this group */
 	unsigned int nr_running;          /* count of runnable GRR tasks on this CPU */
 	unsigned int nr_tasks;            /* total GRR tasks (running + waiting) */
