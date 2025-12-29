@@ -915,15 +915,11 @@ extern void switch_grr_task_group(struct rq *rq, struct task_struct *task, int n
 
 /* Per-CPU runqueue for GRR tasks */
 struct grr_rq {
-
-
-
-
-
 	struct list_head task_list;      /* list of runnable tasks in this group */
 	unsigned int nr_running;          /* count of runnable GRR tasks on this CPU */
 	unsigned int nr_tasks;            /* total GRR tasks (running + waiting) */
-	int curr_group;                   /* which group this CPU belongs to (1 or 2) */
+	int curr_group;          
+	raw_spinlock_t runtime_lock;         /* which group this CPU belongs to (1 or 2) */
 	/* Future:  load balancing info */
 };
 
