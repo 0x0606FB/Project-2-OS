@@ -138,43 +138,43 @@ static bool can_migrate_task_grr(struct task_struct *p, int dst_cpu)
 /*
  * Enqueue a task into the GRR runqueue
  */
-static void enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
-{
-	struct grr_rq *grr_rq = &rq->grr;
+static void enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags) {
+    struct grr_rq *grr_rq = &rq->grr;
+    struct sched_grr_entity *grr_se = &p->grr;
 
-	/* Add task to the end of the run queue (FIFO for round-robin) */
-	list_add_tail(&p->grr_list, &grr_rq->task_list);
+    raw_spin_lock(&grr_rq->grr_runtime_lock);
 
-	/* Update counters */
-	grr_rq->nr_running++;
-	grr_rq->nr_tasks++;
+    if (flags & ENQUEUE_HEAD) {
+        list_add(&grr_se->run_list, &grr_rq->queue);
+    } else {
+        list_add_tail(&grr_se->run_list, &grr_rq->queue);
+    }
 
-	/* Update global rq counter */
-	add_nr_running(rq, 1);
+    grr_rq->grr_nr_running++;
+    raw_spin_unlock(&grr_rq->grr_runtime_lock);
 
-	/* Initialize time slice if this is a fresh enqueue */
-	if (!(flags & ENQUEUE_RESTORE))
-		p->grr_time_slice = GRR_TIMESLICE;
+    // Log the enqueue operation
+    printk(KERN_INFO "GRR: enqueue_task_grr added PID %d, total %d tasks\n",
+           p->pid, grr_rq->grr_nr_running);
 }
 
 /*
  * Dequeue a task from the GRR runqueue
  */
-static bool dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
-{
-	struct grr_rq *grr_rq = &rq->grr;
+static void dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags) {
+    struct grr_rq *grr_rq = &rq->grr;
+    struct sched_grr_entity *grr_se = &p->grr;
 
-	/* Remove task from the run queue */
-	list_del_init(&p->grr_list);
+    raw_spin_lock(&grr_rq->grr_runtime_lock);
 
-	/* Update counters */
-	grr_rq->nr_running--;
-	grr_rq->nr_tasks--;
+    list_del(&grr_se->run_list);
+    grr_rq->grr_nr_running--;
 
-	/* Update global rq counter */
-	sub_nr_running(rq, 1);
+    raw_spin_unlock(&grr_rq->grr_runtime_lock);
 
-	return true;
+    // Log the dequeue operation
+    printk(KERN_INFO "GRR: dequeue_task_grr removed PID %d, total %d tasks\n",
+           p->pid, grr_rq->grr_nr_running);
 }
 
 /*
@@ -253,14 +253,32 @@ static struct task_struct *pick_task_grr(struct rq *rq)
 /*
  * Pick next task and prepare for context switch
  */
-static struct task_struct *pick_next_task_grr(struct rq *rq, struct task_struct *prev)
-{
-	struct task_struct *next = pick_task_grr(rq);
+static struct task_struct *pick_next_task_grr(struct rq *rq) {
+    struct grr_rq *grr_rq = &rq->grr;
+    struct task_struct *next = NULL;
 
-	if (next && prev->sched_class == &grr_sched_class)
-		put_prev_task_grr(rq, prev, next);
+    raw_spin_lock(&grr_rq->grr_runtime_lock);
 
-	return next;
+    if (!list_empty(&grr_rq->queue)) {
+        struct sched_grr_entity *grr_se = list_first_entry(&grr_rq->queue,
+            struct sched_grr_entity, run_list);
+        next = container_of(grr_se, struct task_struct, grr);
+    }
+
+    if (!next) {
+    	printk(KERN_ERR "GRR: No runnable task found, falling back to idle task.\n");
+    	return rq->idle; // Fallback to the idle task for this CPU
+	}
+
+    raw_spin_unlock(&grr_rq->grr_runtime_lock);
+
+    // Log the selected task
+    if (next) {
+        printk(KERN_INFO "GRR: pick_next_task_grr selected PID %d\n", next->pid);
+    } else {
+        printk(KERN_ERR "GRR: pick_next_task_grr selected NULL task\n");
+    }
+    return next;
 }
 
 /*
